@@ -1871,6 +1871,9 @@ InitATLoop:
 ; $00 - temp joypad bit
 
 ReadJoypads:
+	LDA Player_State
+	CMP #$01
+	BEQ +
 
 	LDA #$01                                     ; reset and clear strobe of joypad ports
 	STA JOYPAD_PORT
@@ -1900,7 +1903,7 @@ PortLoop:
 	PLA
 	AND #%11001111                               ; otherwise store without select
 	STA SavedJoypadBits,x                        ; or start bits and leave
-	RTS
++	RTS
 Save8Bits:
 	PLA
 	STA JoypadBitMask,x                          ; save with all bits in another place and leave
@@ -3939,9 +3942,6 @@ GetBlockBufferAddr:
 
 ; -------------------------------------------------------------------------------------
 
-; unused space
-	.db $ff, $ff
-
 ; -------------------------------------------------------------------------------------
 
 AreaDataOfsLoopback:
@@ -4058,9 +4058,6 @@ StoreStyle:
 	.include "src/levels/levels.asm"
 
 ; -------------------------------------------------------------------------------------
-
-; unused space
-	.db $ff
 
 ; -------------------------------------------------------------------------------------
 
@@ -10217,9 +10214,6 @@ ExScrnBd:
 
 ; -------------------------------------------------------------------------------------
 
-; some unused space
-	.db $ff, $ff, $ff
-
 ; -------------------------------------------------------------------------------------
 ; $01 - enemy buffer offset
 
@@ -12361,9 +12355,6 @@ RetYC:
 
 ; -------------------------------------------------------------------------------------
 
-; unused byte
-	.db $ff
-
 ; -------------------------------------------------------------------------------------
 ; $00 - offset to vine Y coordinate adder
 ; $02 - offset to sprite data
@@ -14387,8 +14378,6 @@ SetHFAt:
 
 ; -------------------------------------------------------------------------------------
 
-; unused space
-	.db $ff, $ff, $ff, $ff, $ff, $ff
 
 ; -------------------------------------------------------------------------------------
 
@@ -14400,6 +14389,8 @@ SetHFAt:
 
 ; -------------------------------------------------------------------------------------
 ; INTERRUPT VECTORS
+
+	.pad $FFFA, $FF
 
 	.dw NonMaskableInterrupt
 	.dw Start
