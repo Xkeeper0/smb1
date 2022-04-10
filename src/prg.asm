@@ -325,7 +325,7 @@ TitleScreenMode:
 ; -------------------------------------------------------------------------------------
 
 WSelectBufferTemplate:
-	.db $04, $20, $73, $01, $00, $00
+	.db $08, $20, $73, $03, $00, $28, $00, $00
 
 GameMenuRoutine:
 	LDY #$00
@@ -338,52 +338,53 @@ GameMenuRoutine:
 StartGame:
 	JMP ChkContinue                              ; if either start or A + start, execute here
 ChkSelect:
-	CMP #Select_Button                           ; check to see if the select button was pressed
-	BEQ SelectBLogic                             ; if so, branch reset demo timer
-	LDX DemoTimer                                ; otherwise check demo timer
-	BNE ChkWorldSel                              ; if demo timer not expired, branch to check world selection
-	STA SelectTimer                              ; set controller bits here if running demo
-	JSR DemoEngine                               ; run through the demo actions
-	BCS ResetTitle                               ; if carry flag set, demo over, thus branch
-	JMP RunDemo                                  ; otherwise, run game engine for demo
+	;LDX DemoTimer                                ; otherwise check demo timer
+	;BNE ChkWorldSel                              ; if demo timer not expired, branch to check world selection
+	;STA SelectTimer                              ; set controller bits here if running demo
+	;JSR DemoEngine                               ; run through the demo actions
+	;BCS ResetTitle                               ; if carry flag set, demo over, thus branch
+	;JMP RunDemo                                  ; otherwise, run game engine for demo
+
 ChkWorldSel:
-	LDX WorldSelectEnableFlag                    ; check to see if world selection has been enabled
-	BEQ NullJoypad
+	LDY #0
+	LDA JoypadPressed
 	CMP #B_Button                                ; if so, check to see if the B button was pressed
-	BNE NullJoypad
-	INY                                          ; if so, increment Y and execute same code as select
-SelectBLogic:
-	LDA DemoTimer                                ; if select or B pressed, check demo timer one last time
-	BEQ ResetTitle                               ; if demo timer expired, branch to reset title screen mode
-	LDA #$18                                     ; otherwise reset demo timer
-	STA DemoTimer
-	LDA SelectTimer                              ; check select/B button timer
-	BNE NullJoypad                               ; if not expired, branch
-	LDA #$10                                     ; otherwise reset select button timer
-	STA SelectTimer
-	CPY #$01                                     ; was the B button pressed earlier?  if so, branch
-	BEQ IncWorldSel                              ; note this will not be run if world selection is disabled
-	LDA NumberOfPlayers                          ; if no, must have been the select button, therefore
-	EOR #%00000001                               ; change number of players and draw icon accordingly
-	STA NumberOfPlayers
-	JSR DrawMushroomIcon
-	JMP NullJoypad
-IncWorldSel:
+	BNE +
 	LDX WorldSelectNumber                        ; increment world select number
 	INX
 	TXA
 	AND #%00000111                               ; mask out higher bits
 	STA WorldSelectNumber                        ; store as current world select number
+	INY
+
++	LDA JoypadPressed
+	CMP #A_Button
+	BNE +                              ; note this will not be run if world selection is disabled
+	LDX LevelNumber                        ; increment world select number
+	INX
+	TXA
+	AND #%00000011                               ; mask out higher bits
+	STA LevelNumber                        ; store as current world select number
+	INY
+
++	CPY #00
+	BEQ NullJoypad
 	JSR GoContinue
+
+	LDX #0
 UpdateShroom:
 	LDA WSelectBufferTemplate,x                  ; write template for world select in vram buffer
 	STA VRAM_Buffer1-1,x                         ; do this until all bytes are written
 	INX
-	CPX #$06
+	CPX #$08
 	BMI UpdateShroom
 	LDY WorldNumber                              ; get world number from variable and increment for
 	INY                                          ; proper display, and put in blank byte before
 	STY VRAM_Buffer1+3                           ; null terminator
+	LDY LevelNumber                              ; get world number from variable and increment for
+	INY                                          ; proper display, and put in blank byte before
+	STY VRAM_Buffer1+5                           ; null terminator
+
 NullJoypad:
 	LDA #$00                                     ; clear joypad bits for player 1
 	STA SavedJoypad1Bits
@@ -426,11 +427,15 @@ InitScores:
 ExitMenu:
 	RTS
 GoContinue:
+	LDA WorldSelectNumber
 	STA WorldNumber                              ; start both players at the first area
-	STA OffScr_WorldNumber                       ; of the previously saved world number
-	LDX #$00                                     ; note that on power-up using this function
-	STX AreaNumber                               ; will make no difference
-	STX OffScr_AreaNumber
+	ASL
+	ASL
+	CLC
+	ADC LevelNumber
+	TAX
+	LDA WorldLevelToArea,X
+	STA AreaNumber
 	RTS
 
 ; -------------------------------------------------------------------------------------
@@ -1071,7 +1076,6 @@ WorldLivesDisplay:
 	.db $21, $4b, $09, $20, $18                  ; "WORLD  - " used on lives display
 	.db $1b, $15, $0d, $24, $24, $28, $24
 	.db $22, $0c, $47, $24                       ; possibly used to clear time up
-	.db $23, $dc, $01, $ba                       ; attribute table data for crown if more than 9 lives
 	.db $ff
 
 TwoPlayerTimeUp:
@@ -1147,14 +1151,15 @@ EndGameText:
 	DEX                                          ; are we printing the world/lives display?
 	BNE CheckPlayerName                          ; if not, branch to check player's name
 	LDA NumberofLives                            ; otherwise, check number of lives
-	CLC                                          ; and increment by one for display
-	ADC #$01
-	CMP #10                                      ; more than 9 lives?
-	BCC PutLives
-	SBC #10                                      ; if so, subtract 10 and put a crown tile
-	LDY #$9f                                     ; next to the difference...strange things happen if
-	STY VRAM_Buffer1+7                           ; the number of lives exceeds 19
-PutLives:
+	LDY #$FF
+-	INY
+	SBC #10
+	BCS -
+	CPY #$00
+	BEQ +
+	STY VRAM_Buffer1+7
++	SEC
+	ADC #10
 	STA VRAM_Buffer1+8
 	LDY WorldNumber                              ; write world and level numbers (incremented for display)
 	INY                                          ; to the buffer in the spaces surrounding the dash
@@ -1871,11 +1876,13 @@ InitATLoop:
 ; $00 - temp joypad bit
 
 ReadJoypads:
+	LDA SwimmingFlag
+	BNE +
 	LDA Player_State
 	CMP #$01
-	BEQ +
+	BEQ ++
 
-	LDA #$01                                     ; reset and clear strobe of joypad ports
++	LDA #$01                                     ; reset and clear strobe of joypad ports
 	STA JOYPAD_PORT
 	LSR
 	TAX                                          ; start with joypad 1's port
@@ -1897,17 +1904,22 @@ PortLoop:
 	BNE PortLoop                                 ; count down bits left
 	STA SavedJoypadBits,x                        ; save controller status here always
 	PHA
-	AND #%00110000                               ; check for select or start
-	AND JoypadBitMask,x                          ; if neither saved state nor current state
-	BEQ Save8Bits                                ; have any of these two set, branch
-	PLA
-	AND #%11001111                               ; otherwise store without select
-	STA SavedJoypadBits,x                        ; or start bits and leave
-+	RTS
+;	AND #%00110000                               ; check for select or start
+;	AND JoypadBitMask,x                          ; if neither saved state nor current state
+;	BEQ Save8Bits                                ; have any of these two set, branch
+;	PLA
+;	AND #%11001111                               ; otherwise store without select
+;	STA SavedJoypadBits,x                        ; or start bits and leave
+;	RTS
 Save8Bits:
+	LDA JoypadBitMask,x
+	EOR #$FF
+	AND SavedJoypadBits,x
+	STA JoypadPressed,x                          ; save with all bits in another place and leave
+
 	PLA
 	STA JoypadBitMask,x                          ; save with all bits in another place and leave
-	RTS
+++	RTS
 
 ; -------------------------------------------------------------------------------------
 ; $00 - vram buffer address table low
@@ -2202,8 +2214,8 @@ PrimaryGameSetup:
 	LDA #$01
 	STA FetchNewGameTimerFlag                    ; set flag to load game timer from header
 	STA PlayerSize                               ; set player's size to small
-	LDA #$02
-	STA NumberofLives                            ; give each player three lives
+	LDA #$00
+	STA NumberofLives                            ; set 0 lives for both players
 	STA OffScr_NumberofLives
 
 SecondaryGameSetup:
@@ -2408,13 +2420,10 @@ PlayerLoseLife:
 	STA Sprite0HitDetectFlag
 	LDA #Silence                                 ; silence music
 	STA EventMusicQueue
-	DEC NumberofLives                            ; take one life from player
-	BPL StillInGame                              ; if player still has lives, branch
-	LDA #$00
-	STA OperMode_Task                            ; initialize mode task,
-	LDA #GameOverModeValue                       ; switch to game over mode
-	STA OperMode                                 ; and leave
-	RTS
+	INC NumberofLives                            ; add one death to player
+	BNE StillInGame                              ; if couunter not maxed out
+	LDA #$FF
+	STA NumberofLives                            ; reset to 255
 StillInGame:
 	LDA WorldNumber                              ; multiply world number by 2 and use
 	ASL                                          ; as offset
@@ -2447,35 +2456,8 @@ SetHalfway:
 ; -------------------------------------------------------------------------------------
 
 GameOverMode:
-	LDA OperMode_Task
-	JSR JumpEngine
+	; nobody here but us chickens
 
-	.dw SetupGameOver
-	.dw ScreenRoutines
-	.dw RunGameOver
-
-; -------------------------------------------------------------------------------------
-
-SetupGameOver:
-	LDA #$00                                     ; reset screen routine task control for title screen, game,
-	STA ScreenRoutineTask                        ; and game over modes
-	STA Sprite0HitDetectFlag                     ; disable sprite 0 check
-	LDA #GameOverMusic
-	STA EventMusicQueue                          ; put game over music in secondary queue
-	INC DisableScreenFlag                        ; disable screen output
-	INC OperMode_Task                            ; set secondary mode to 1
-	RTS
-
-; -------------------------------------------------------------------------------------
-
-RunGameOver:
-	LDA #$00                                     ; reenable screen
-	STA DisableScreenFlag
-	LDA SavedJoypad1Bits                         ; check controller for start pressed
-	AND #Start_Button
-	BNE TerminateGame
-	LDA ScreenTimer                              ; if not pressed, wait for
-	BNE GameIsOn                                 ; screen timer to expire
 TerminateGame:
 	LDA #Silence                                 ; silence music
 	STA EventMusicQueue

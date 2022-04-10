@@ -32,6 +32,7 @@ SavedJoypadBits       = $06fc
 SavedJoypad1Bits      = $06fc
 SavedJoypad2Bits      = $06fd
 JoypadBitMask         = $074a
+JoypadPressed         = $074c
 JoypadOverride        = $0758
 
 A_B_Buttons           = $0a

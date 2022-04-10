@@ -24,6 +24,19 @@ World7Areas:
 World8Areas:
 	.db $30, $32, $21, $65
 
+
+WorldLevelToArea:
+	.db $00, $01,      $03, $04  ; 1
+	.db $00, $01,      $03, $04  ; 2
+	.db $00, $01, $02, $03       ; 3
+	.db $00, $01,      $03, $04  ; 4
+	.db $00, $01, $02, $03       ; 5
+	.db $00, $01, $02, $03       ; 6
+	.db $00, $01,      $03, $04  ; 7
+	.db $00, $01, $02, $03       ; 8
+
+
+
 ; bonus area data offsets, included here for comparison purposes
 ; underground bonus area  - c2
 ; cloud area 1 (day)      - 2b
