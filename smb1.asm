@@ -12,6 +12,8 @@
 
 
 
+; STUPID_PHYSICS_CRAP disables joypad input while jumping
+
 ; -----------------------------------------
 ; Add definitions
 .enum $0000

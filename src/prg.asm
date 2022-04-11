@@ -669,14 +669,14 @@ FloateyNumTileData:
 	.db $f8, $50                                 ; "4000"
 	.db $f9, $50                                 ; "5000"
 	.db $fa, $50                                 ; "8000"
-	.db $fd, $fe                                 ; "1-UP"
+	.db $f6, $fd                                 ; "10 K"
 
 ; high nybble is digit number, low nybble is number to
 ; add to the digit of the player's score
 ScoreUpdateData:
 	.db $ff                                      ; dummy
 	.db $41, $42, $44, $45, $48
-	.db $31, $32, $34, $35, $38, $00
+	.db $31, $32, $34, $35, $38, $21
 
 FloateyNumbersRoutine:
 	LDA FloateyNum_Control,x                     ; load control for floatey number
@@ -695,11 +695,11 @@ DecNumTimer:
 	DEC FloateyNum_Timer,x                       ; decrement value here
 	CMP #$2b                                     ; if not reached a certain point, branch
 	BNE ChkTallEnemy
-	CPY #$0b                                     ; check offset for $0b
-	BNE LoadNumTiles                             ; branch ahead if not found
-	INC NumberofLives                            ; give player one extra life (1-up)
-	LDA #Sfx_ExtraLife
-	STA Square2SoundQueue                        ; and play the 1-up sound
+	;CPY #$0b                                     ; check offset for $0b
+	;BNE LoadNumTiles                             ; branch ahead if not found
+	;INC NumberofLives                            ; give player one extra life (1-up)
+	;LDA #Sfx_ExtraLife
+	;STA Square2SoundQueue                        ; and play the 1-up sound
 LoadNumTiles:
 	LDA ScoreUpdateData,y                        ; load point value here
 	LSR                                          ; move high nybble to low
@@ -1151,16 +1151,17 @@ EndGameText:
 	DEX                                          ; are we printing the world/lives display?
 	BNE CheckPlayerName                          ; if not, branch to check player's name
 	LDA NumberofLives                            ; otherwise, check number of lives
-	LDY #$FF
--	INY
+	LDY #$00
+-	CMP #10
+	BCC +
 	SBC #10
-	BCS -
-	CPY #$00
+	INY
+	BNE -
++	CPY #$00
 	BEQ +
 	STY VRAM_Buffer1+7
-+	SEC
-	ADC #10
-	STA VRAM_Buffer1+8
++	STA VRAM_Buffer1+8
+
 	LDY WorldNumber                              ; write world and level numbers (incremented for display)
 	INY                                          ; to the buffer in the spaces surrounding the dash
 	STY VRAM_Buffer1+19
@@ -1876,11 +1877,13 @@ InitATLoop:
 ; $00 - temp joypad bit
 
 ReadJoypads:
+IFDEF STUPID_PHYSICS_CRAP
 	LDA SwimmingFlag
 	BNE +
 	LDA Player_State
 	CMP #$01
 	BEQ ++
+ENDIF
 
 +	LDA #$01                                     ; reset and clear strobe of joypad ports
 	STA JOYPAD_PORT
@@ -1904,13 +1907,6 @@ PortLoop:
 	BNE PortLoop                                 ; count down bits left
 	STA SavedJoypadBits,x                        ; save controller status here always
 	PHA
-;	AND #%00110000                               ; check for select or start
-;	AND JoypadBitMask,x                          ; if neither saved state nor current state
-;	BEQ Save8Bits                                ; have any of these two set, branch
-;	PLA
-;	AND #%11001111                               ; otherwise store without select
-;	STA SavedJoypadBits,x                        ; or start bits and leave
-;	RTS
 Save8Bits:
 	LDA JoypadBitMask,x
 	EOR #$FF
